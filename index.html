@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Livro de Empréstimos</title>
+<title>Controle de Empréstimos</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -46,6 +46,8 @@
     .brand-mark{width:30px; height:30px; font-size:14px; margin-bottom:0; margin-right:0;}
     .brand h1, .brand p{display:none;}
     .btn-new{margin:0; padding:9px 12px; font-size:12.5px; white-space:nowrap; flex-shrink:0; min-height:38px;}
+    .backup-row{margin:0; flex-shrink:0;}
+    .btn-backup{white-space:nowrap; padding:9px 10px; min-height:38px; font-size:11.5px;}
     .loan-list{
       display:flex; flex-direction:row; gap:8px; overflow-x:auto; flex:0 1 auto;
       -webkit-overflow-scrolling:touch; margin:0; padding:0 2px;
@@ -125,6 +127,14 @@
     cursor:pointer; letter-spacing:.2px;
   }
   .btn-new:hover{background:#152238;}
+
+  .backup-row{margin:10px 24px 0; display:flex; gap:8px;}
+  .btn-backup{
+    flex:1; background:transparent; border:1px solid var(--rule); color:var(--ink-soft);
+    padding:7px 10px; border-radius:4px; font-family:'IBM Plex Sans',sans-serif;
+    font-weight:600; font-size:11.5px; cursor:pointer;
+  }
+  .btn-backup:hover{background:var(--gold-soft); color:var(--ink); border-color:var(--gold);}
 
   .empty-side{padding:24px; font-size:13px; color:var(--ink-soft);}
 
@@ -232,9 +242,9 @@
   .pay-form{display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
   .pay-form input{
     font-family:'IBM Plex Mono',monospace; font-size:12.5px; padding:6px 8px;
-    border:1px solid var(--rule); border-radius:3px; width:96px;
+    border:1px solid var(--rule); border-radius:3px; width:88px;
   }
-  .pay-form input[type=date]{width:130px;}
+  .pay-form input.date-input{width:100px;}
   .mini-btn{
     background:var(--ink); color:#fff; border:none; padding:6px 10px; border-radius:3px;
     font-size:11.5px; cursor:pointer; font-family:'IBM Plex Sans',sans-serif; font-weight:600;
@@ -248,7 +258,7 @@
   }
   .icon-btn:hover{background:var(--gold-soft); color:var(--ink); border-color:var(--gold);}
   @media (max-width:640px){
-    .icon-btn{width:36px; height:36px; font-size:16px; align-self:flex-end;}
+    .icon-btn{width:34px; height:34px; font-size:15px;}
   }
   .table-scroll{overflow-x:auto;}
   .footnote{font-size:11.5px; color:var(--ink-soft); margin-top:14px; font-family:'IBM Plex Sans',sans-serif; line-height:1.5;}
@@ -274,11 +284,14 @@
       text-transform:uppercase; letter-spacing:.3px; color:var(--ink-soft); font-weight:600; text-align:left;
     }
     .ledger td[data-label="#"]{font-size:14px; font-weight:700;}
-    .pay-form{width:100%; flex-direction:column; align-items:stretch; gap:8px;}
-    .pay-form input{width:100%; min-height:42px; font-size:16px;}
-    .pay-form input[type=date]{width:100%;}
-    .mini-btn{width:100%; min-height:40px; font-size:13px;}
-    .mini-btn.undo{width:100%;}
+    .pay-form{
+      display:grid; grid-template-columns:1fr 1fr; gap:7px; width:100%;
+    }
+    .pay-form input{
+      width:100%; min-height:36px; font-size:16px; padding:5px 7px;
+    }
+    .pay-form .mini-btn{grid-column:1 / -1; width:100%; min-height:36px; font-size:12.5px;}
+    .pay-form .icon-btn{grid-column:1 / -1; justify-self:end;}
   }
 
   /* Modal */
@@ -303,14 +316,19 @@
   /* Print */
   #printArea{display:none;}
   @media print{
-    body *{visibility:hidden;}
-    #printArea, #printArea *{visibility:visible;}
-    #printArea{display:block; position:absolute; top:0; left:0; width:100%; padding:20px; font-family:'IBM Plex Sans',sans-serif; color:#111;}
-    #printArea h1{font-family:'Spectral',serif;}
+    html, body{ height:auto !important; margin:0; padding:0; overflow:visible !important; }
+    .app, .overlay{ display:none !important; }
+    #printArea{
+      display:block !important; position:static; width:100%; padding:0;
+      font-family:'IBM Plex Sans',sans-serif; color:#111;
+    }
+    #printArea h1{font-family:'Spectral',serif; margin-top:0;}
     .p-table{width:100%; border-collapse:collapse; font-family:'IBM Plex Mono',monospace; font-size:11.5px;}
     .p-table th, .p-table td{border:1px solid #999; padding:6px 8px; text-align:left;}
+    .p-table tr{page-break-inside:avoid;}
     .p-table td.num, .p-table th.num{text-align:right;}
     .p-summary{display:flex; gap:24px; margin:16px 0 20px; font-family:'IBM Plex Mono',monospace;}
+    @page{ margin: 14mm; }
   }
 </style>
 </head>
@@ -319,11 +337,16 @@
 <div class="app">
   <aside class="sidebar">
     <div class="brand">
-      <div class="brand-mark">L</div>
-      <h1>Livro de Empréstimos</h1>
+      <div class="brand-mark">C</div>
+      <h1>Controle de Empréstimos</h1>
       <p>Controle de valores emprestados a terceiros</p>
     </div>
     <button class="btn-new" id="btnNewLoan">+ Novo empréstimo</button>
+    <div class="backup-row">
+      <button class="btn-backup" id="btnBackup" title="Baixar backup de todos os empréstimos">⬇ Backup</button>
+      <button class="btn-backup" id="btnRestore" title="Restaurar a partir de um arquivo de backup">⬆ Restaurar</button>
+    </div>
+    <input type="file" id="fileRestore" accept="application/json,.json" style="display:none;">
     <ul class="loan-list" id="loanList"></ul>
   </aside>
 
@@ -410,6 +433,30 @@ function maskCurrencyInput(el){
 function parseCurrencyInput(el){
   if(!el || !el.value) return NaN;
   return parseFloat(el.value.replace(/\./g,'').replace(',', '.'));
+}
+
+function isoToBR(iso){
+  if(!iso) return '';
+  const [y,m,d] = iso.split('-');
+  if(!y || !m || !d) return '';
+  return `${d}/${m}/${y}`;
+}
+function brToISO(br){
+  if(!br) return '';
+  const match = br.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if(!match) return '';
+  return `${match[3]}-${match[2]}-${match[1]}`;
+}
+function maskDateInput(el){
+  if(!el || el.dataset.maskedDate) return;
+  el.dataset.maskedDate = '1';
+  el.addEventListener('input', () => {
+    const digits = el.value.replace(/\D/g,'').slice(0,8);
+    let out = digits;
+    if(digits.length > 4) out = `${digits.slice(0,2)}/${digits.slice(2,4)}/${digits.slice(4)}`;
+    else if(digits.length > 2) out = `${digits.slice(0,2)}/${digits.slice(2)}`;
+    el.value = out;
+  });
 }
 
 let loans = [];
@@ -565,9 +612,15 @@ function renderSidebar(){
     list.innerHTML = '<div class="empty-side">Nenhum empréstimo cadastrado ainda.</div>';
     return;
   }
+  loans.forEach(loan => recalcularLoan(loan));
+
+  const loansOrdenados = [...loans].sort((a, b) => {
+    if(a.quitado !== b.quitado) return a.quitado ? 1 : -1;
+    return new Date(a.data) - new Date(b.data);
+  });
+
   list.innerHTML = '';
-  loans.forEach(loan => {
-    recalcularLoan(loan);
+  loansOrdenados.forEach(loan => {
     const li = document.createElement('li');
     li.className = 'loan-item' + (loan.id === currentId ? ' active' : '');
     let badge = '<span class="badge ativo">Ativo</span>';
@@ -656,7 +709,7 @@ function renderMain(){
     } else if(editingParcela === p.numero){
       pagamentoCell = `
         <div class="pay-form">
-          <input type="date" id="editDate" value="${p.vencimento}">
+          <input type="text" inputmode="numeric" class="date-input" id="editDate" value="${isoToBR(p.vencimento)}" placeholder="dd/mm/aaaa" maxlength="10">
           <input type="text" inputmode="numeric" id="editValue" value="${fmtNum(p.valorPrevisto)}">
           <button class="mini-btn" data-save-edit="${p.numero}">Salvar</button>
           ${p.valorManual ? `<button class="mini-btn undo" data-reset-auto="${p.numero}">Restaurar cálculo</button>` : ''}
@@ -666,7 +719,7 @@ function renderMain(){
     } else {
       pagamentoCell = `
         <div class="pay-form">
-          <input type="date" data-date="${p.numero}" value="${p.vencimentoOriginal}">
+          <input type="text" inputmode="numeric" class="date-input" data-date="${p.numero}" value="${isoToBR(p.vencimentoOriginal)}" placeholder="dd/mm/aaaa" maxlength="10">
           <input type="text" inputmode="numeric" data-value="${p.numero}" placeholder="${fmtNum(p.valorPrevisto)}">
           <button class="mini-btn" data-pay="${p.numero}">Registrar</button>
           <button class="mini-btn undo" data-edit="${p.numero}">editar parcela</button>
@@ -695,7 +748,7 @@ function renderMain(){
 
     if(dateInput && valueInput){
       const sincronizarValor = () => {
-        const novaData = dateInput.value;
+        const novaData = brToISO(dateInput.value);
         if(!novaData) return;
         const dias = Math.max(0, Math.round((new Date(novaData+'T00:00:00') - new Date(dataBaseRef+'T00:00:00')) / 86400000));
         const ia = loan.taxa/100;
@@ -703,6 +756,7 @@ function renderMain(){
         const novoValor = Math.max(jurosProporcional + p.amortCalc, 0);
         valueInput.value = fmtNum(novoValor);
       };
+      maskDateInput(dateInput);
       dateInput.addEventListener('input', sincronizarValor);
       dateInput.addEventListener('change', sincronizarValor);
     }
@@ -721,7 +775,7 @@ function renderMain(){
       if(isNaN(valor) || valor <= 0) valor = parcela.valorPrevisto;
       parcela.pago = true;
       parcela.valorPago = valor;
-      parcela.dataPagamento = dateInput.value || todayStr();
+      parcela.dataPagamento = brToISO(dateInput.value) || todayStr();
       await saveLoans();
       renderAll();
     });
@@ -757,7 +811,7 @@ function renderMain(){
     btn.addEventListener('click', async () => {
       const num = Number(btn.dataset.saveEdit);
       const parcela = loan.parcelas.find(p => p.numero === num);
-      const newDate = document.getElementById('editDate').value;
+      const newDate = brToISO(document.getElementById('editDate').value);
       const newValue = parseCurrencyInput(document.getElementById('editValue'));
       if(newDate) parcela.vencimento = newDate;
       if(!isNaN(newValue) && newValue > 0){
@@ -775,7 +829,10 @@ function renderMain(){
       const num = Number(btn.dataset.resetDate);
       const parcela = loan.parcelas.find(p => p.numero === num);
       const dateField = document.getElementById('editDate');
-      if(dateField) dateField.value = parcela.vencimentoOriginal;
+      if(dateField){
+        dateField.value = isoToBR(parcela.vencimentoOriginal);
+        dateField.dispatchEvent(new Event('input', {bubbles:true}));
+      }
     });
   });
 
@@ -830,10 +887,10 @@ function printLoan(loan){
 
   area.innerHTML = `
     <h1>Contrato de Empréstimo</h1>
-    <p><strong>Mutuário:</strong> ${loan.mutuario}<br>
-    <strong>Data do empréstimo:</strong> ${fmtDate(loan.data)}<br>
-    <strong>Valor emprestado:</strong> ${fmtBRL(loan.principal)}<br>
-    <strong>Taxa de juros:</strong> ${loan.taxa.toFixed(2)}% ao ano (Sistema Price)<br>
+    <p><strong>Nome:</strong> ${loan.mutuario}<br>
+    <strong>Data:</strong> ${fmtDate(loan.data)}<br>
+    <strong>Valor:</strong> ${fmtBRL(loan.principal)}<br>
+    <strong>Encargos:</strong> ${loan.taxa.toFixed(2)}% ao ano (Sistema Price)<br>
     <strong>Quantidade de parcelas:</strong> ${loan.numParcelas}</p>
 
     <div class="p-summary">
@@ -854,6 +911,53 @@ function printLoan(loan){
   `;
   window.print();
 }
+
+// ---------- Backup / Restauração ----------
+function exportarBackup(){
+  const conteudo = JSON.stringify(loans, null, 2);
+  const blob = new Blob([conteudo], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `backup-emprestimos-${todayStr()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function importarBackup(file){
+  let dados;
+  try{
+    const texto = await file.text();
+    dados = JSON.parse(texto);
+  }catch(e){
+    alert('Não foi possível ler o arquivo. Verifique se é um backup válido (.json).');
+    return;
+  }
+  if(!Array.isArray(dados)){
+    alert('Arquivo de backup inválido.');
+    return;
+  }
+  const confirmMsg = loans.length
+    ? `Isso vai substituir os ${loans.length} empréstimo(s) atuais pelos ${dados.length} do backup. Essa ação não pode ser desfeita. Deseja continuar?`
+    : `Restaurar ${dados.length} empréstimo(s) do backup?`;
+  if(!confirm(confirmMsg)) return;
+  loans = dados;
+  currentId = null;
+  editingParcela = null;
+  await saveLoans();
+  renderAll();
+  alert('Backup restaurado com sucesso.');
+}
+
+document.getElementById('btnBackup').addEventListener('click', exportarBackup);
+document.getElementById('btnRestore').addEventListener('click', () => document.getElementById('fileRestore').click());
+document.getElementById('fileRestore').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if(file) await importarBackup(file);
+  e.target.value = '';
+});
 
 // ---------- New loan form ----------
 const overlay = document.getElementById('overlay');
