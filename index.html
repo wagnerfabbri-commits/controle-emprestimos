@@ -167,6 +167,11 @@
     font-family:'IBM Plex Mono',monospace; font-size:14px; background:#fff; color:var(--ink);
   }
   .field input:focus{outline:2px solid var(--gold); outline-offset:1px;}
+  .date-overlay-wrap{ position:relative; display:block; width:100%; }
+  .date-overlay-wrap .date-native-overlay{
+    position:absolute; inset:0; width:100%; height:100%;
+    opacity:0; margin:0; padding:0; border:0; cursor:pointer;
+  }
   .row2{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
   .form-actions{display:flex; gap:10px; margin-top:22px;}
   .btn-primary{
@@ -247,7 +252,7 @@
     font-family:'IBM Plex Mono',monospace; font-size:12.5px; padding:6px 8px;
     border:1px solid var(--rule); border-radius:3px; width:88px;
   }
-  .pay-form input.date-input{width:100px;}
+  .pay-form .date-overlay-wrap{width:100px; flex-shrink:0;}
   .mini-btn{
     background:var(--ink); color:#fff; border:none; padding:6px 10px; border-radius:3px;
     font-size:11.5px; cursor:pointer; font-family:'IBM Plex Sans',sans-serif; font-weight:600;
@@ -293,6 +298,7 @@
     .pay-form input{
       width:100%; min-height:36px; font-size:16px; padding:5px 7px;
     }
+    .pay-form .date-overlay-wrap{width:100%;}
     .pay-form .mini-btn{grid-column:1 / -1; width:100%; min-height:36px; font-size:12.5px;}
     .pay-form .icon-btn{grid-column:1 / -1; justify-self:end;}
   }
@@ -371,7 +377,10 @@
     <div class="row2">
       <div class="field">
         <label>Data do empréstimo</label>
-        <input type="text" inputmode="numeric" id="fData" placeholder="dd/mm/aaaa" maxlength="10">
+        <div class="date-overlay-wrap">
+          <input type="text" inputmode="numeric" id="fData" placeholder="dd/mm/aaaa" maxlength="10" readonly>
+          <input type="date" id="fDataOverlay" class="date-native-overlay" tabindex="-1" aria-hidden="true">
+        </div>
       </div>
       <div class="field">
         <label>Valor emprestado (R$)</label>
@@ -450,15 +459,14 @@ function brToISO(br){
   if(!match) return '';
   return `${match[3]}-${match[2]}-${match[1]}`;
 }
-function maskDateInput(el){
-  if(!el || el.dataset.maskedDate) return;
-  el.dataset.maskedDate = '1';
-  el.addEventListener('input', () => {
-    const digits = el.value.replace(/\D/g,'').slice(0,8);
-    let out = digits;
-    if(digits.length > 4) out = `${digits.slice(0,2)}/${digits.slice(2,4)}/${digits.slice(4)}`;
-    else if(digits.length > 2) out = `${digits.slice(0,2)}/${digits.slice(2)}`;
-    el.value = out;
+function wireDateOverlay(displayEl, overlayEl){
+  if(!displayEl || !overlayEl) return;
+  overlayEl.value = brToISO(displayEl.value) || '';
+  if(overlayEl.dataset.wired) return;
+  overlayEl.dataset.wired = '1';
+  overlayEl.addEventListener('change', () => {
+    displayEl.value = isoToBR(overlayEl.value);
+    displayEl.dispatchEvent(new Event('input', {bubbles:true}));
   });
 }
 
@@ -744,7 +752,10 @@ function renderMain(){
     } else if(editingParcela === p.numero){
       pagamentoCell = `
         <div class="pay-form">
-          <input type="text" inputmode="numeric" class="date-input" id="editDate" value="${isoToBR(p.vencimento)}" placeholder="dd/mm/aaaa" maxlength="10">
+          <div class="date-overlay-wrap date-input">
+            <input type="text" inputmode="numeric" id="editDate" value="${isoToBR(p.vencimento)}" placeholder="dd/mm/aaaa" maxlength="10" readonly>
+            <input type="date" class="date-native-overlay" data-overlay-for="editDate" tabindex="-1" aria-hidden="true">
+          </div>
           <input type="text" inputmode="numeric" id="editValue" value="${fmtNum(p.valorPrevisto)}">
           <button class="mini-btn" data-save-edit="${p.numero}">Salvar</button>
           ${p.valorManual ? `<button class="mini-btn undo" data-reset-auto="${p.numero}">Restaurar cálculo</button>` : ''}
@@ -754,7 +765,10 @@ function renderMain(){
     } else {
       pagamentoCell = `
         <div class="pay-form">
-          <input type="text" inputmode="numeric" class="date-input" data-date="${p.numero}" value="${isoToBR(p.vencimentoOriginal)}" placeholder="dd/mm/aaaa" maxlength="10">
+          <div class="date-overlay-wrap date-input">
+            <input type="text" inputmode="numeric" id="payDate${p.numero}" data-date="${p.numero}" value="${isoToBR(p.vencimentoOriginal)}" placeholder="dd/mm/aaaa" maxlength="10" readonly>
+            <input type="date" class="date-native-overlay" data-overlay-for="payDate${p.numero}" tabindex="-1" aria-hidden="true">
+          </div>
           <input type="text" inputmode="numeric" data-value="${p.numero}" placeholder="${fmtNum(p.valorPrevisto)}">
           <button class="mini-btn" data-pay="${p.numero}">Registrar</button>
           <button class="mini-btn undo" data-edit="${p.numero}">editar parcela</button>
@@ -782,6 +796,8 @@ function renderMain(){
       : (!p.pago ? tr.querySelector(`[data-value="${p.numero}"]`) : null);
 
     if(dateInput && valueInput){
+      const overlayInput = tr.querySelector(`[data-overlay-for="${dateInput.id}"]`);
+      wireDateOverlay(dateInput, overlayInput);
       const sincronizarValor = () => {
         const novaData = brToISO(dateInput.value);
         if(!novaData) return;
@@ -791,7 +807,6 @@ function renderMain(){
         const novoValor = Math.max(jurosProporcional + p.amortCalc, 0);
         valueInput.value = fmtNum(novoValor);
       };
-      maskDateInput(dateInput);
       dateInput.addEventListener('input', sincronizarValor);
       dateInput.addEventListener('change', sincronizarValor);
     }
@@ -1003,7 +1018,7 @@ document.getElementById('btnNewLoan').addEventListener('click', () => {
   document.getElementById('fTaxa').value = '';
   document.getElementById('fParcelas').value = '';
   maskCurrencyInput(document.getElementById('fValor'));
-  maskDateInput(document.getElementById('fData'));
+  wireDateOverlay(document.getElementById('fData'), document.getElementById('fDataOverlay'));
   overlay.classList.add('open');
 });
 document.getElementById('btnCancelLoan').addEventListener('click', () => overlay.classList.remove('open'));
