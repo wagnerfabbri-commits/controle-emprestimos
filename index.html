@@ -171,6 +171,7 @@
   .date-overlay-wrap .date-native-overlay{
     position:absolute; inset:0; width:100%; height:100%;
     opacity:0; margin:0; padding:0; border:0; cursor:pointer;
+    font-size:16px;
   }
   .row2{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
   .form-actions{display:flex; gap:10px; margin-top:22px;}
@@ -821,8 +822,13 @@ function renderMain(){
       const valInput = tbody.querySelector(`[data-value="${num}"]`);
       const dateInput = tbody.querySelector(`[data-date="${num}"]`);
       const parcela = loan.parcelas.find(p => p.numero === num);
-      let valor = parseCurrencyInput(valInput);
-      if(isNaN(valor) || valor <= 0) valor = parcela.valorPrevisto;
+      let valor;
+      if(valInput.value === ''){
+        valor = parcela.valorPrevisto;
+      } else {
+        valor = parseCurrencyInput(valInput);
+        if(isNaN(valor) || valor < 0) valor = parcela.valorPrevisto;
+      }
       parcela.pago = true;
       parcela.valorPago = valor;
       parcela.dataPagamento = brToISO(dateInput.value) || todayStr();
@@ -864,7 +870,7 @@ function renderMain(){
       const newDate = brToISO(document.getElementById('editDate').value);
       const newValue = parseCurrencyInput(document.getElementById('editValue'));
       if(newDate) parcela.vencimento = newDate;
-      if(!isNaN(newValue) && newValue > 0){
+      if(!isNaN(newValue) && newValue >= 0){
         parcela.valorPrevisto = newValue;
         parcela.valorManual = true;
       }
