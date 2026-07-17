@@ -211,6 +211,13 @@
   .btn-secondary:hover{background:var(--paper);}
 
   /* Contract card */
+  .btn-back{
+    display:inline-flex; align-items:center; gap:4px; margin-bottom:16px;
+    background:transparent; border:1px solid var(--rule); color:var(--ink-soft);
+    padding:8px 14px; border-radius:4px; font-family:'IBM Plex Sans',sans-serif;
+    font-weight:600; font-size:13px; cursor:pointer;
+  }
+  .btn-back:hover{background:var(--gold-soft); color:var(--ink); border-color:var(--gold);}
   .contract-head{
     display:flex; justify-content:space-between; align-items:flex-start; gap:20px;
     flex-wrap:wrap; margin-bottom:26px;
@@ -736,6 +743,7 @@ function renderMain(){
   const proxima = loan.parcelas.find(p => !p.pago);
 
   main.innerHTML = `
+    <button class="btn-back" id="btnBackHome">← Voltar</button>
     <div class="contract-head">
       <div class="contract-title">
         <h2>${loan.mutuario}</h2>
@@ -939,6 +947,12 @@ function renderMain(){
       await saveLoans();
       renderAll();
     });
+  });
+
+  document.getElementById('btnBackHome').addEventListener('click', () => {
+    currentId = null;
+    editingParcela = null;
+    renderAll();
   });
 
   document.getElementById('btnEditConditions').addEventListener('click', () => {
