@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Livro de Empréstimos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#20304A;
+    --ink-soft:#4B5B72;
+    --paper:#F1E9D8;
+    --paper-white:#FBF7EE;
+    --rule:#C9BB9E;
+    --gold:#9C7A3C;
+    --gold-soft:#E4D3AC;
+    --credit:#2F5D42;
+    --credit-bg:#E4EEE5;
+    --debit:#8B2E2E;
+    --debit-bg:#F4E1DD;
+    --shadow: 0 1px 3px rgba(32,48,74,0.12), 0 8px 24px rgba(32,48,74,0.06);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', sans-serif;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  .app{
+    display:grid;
+    grid-template-columns: 300px 1fr;
+    min-height:100vh;
+  }
+  @media (max-width: 640px){
+    .app{grid-template-columns: 1fr;}
+    .sidebar{
+      order:1; border-right:none; border-bottom:2px solid var(--rule);
+      flex-direction:row; align-items:center; padding:10px 12px; gap:10px;
+      position:sticky; top:0; z-index:20; overflow-x:auto; -webkit-overflow-scrolling:touch;
+    }
+    .brand{padding:0; border-bottom:none; margin-bottom:0; display:flex; align-items:center; flex-shrink:0;}
+    .brand-mark{width:30px; height:30px; font-size:14px; margin-bottom:0; margin-right:0;}
+    .brand h1, .brand p{display:none;}
+    .btn-new{margin:0; padding:9px 12px; font-size:12.5px; white-space:nowrap; flex-shrink:0; min-height:38px;}
+    .loan-list{
+      display:flex; flex-direction:row; gap:8px; overflow-x:auto; flex:0 1 auto;
+      -webkit-overflow-scrolling:touch; margin:0; padding:0 2px;
+    }
+    .loan-item{
+      padding:8px 12px; border-bottom:none; border:1px solid var(--rule); border-radius:20px;
+      white-space:nowrap; flex-shrink:0; display:flex; align-items:center; gap:6px;
+    }
+    .loan-item.active::before{display:none;}
+    .loan-item .name{font-size:12.5px; margin-bottom:0;}
+    .loan-item .meta{display:none;}
+    .badge{margin-top:0; font-size:8.5px;}
+    .main{order:2;}
+  }
+
+  /* ---- Sidebar ---- */
+  .sidebar{
+    background:var(--paper-white);
+    border-right:2px solid var(--rule);
+    padding:28px 0 40px;
+    display:flex;
+    flex-direction:column;
+  }
+  .brand{
+    padding:0 24px 20px;
+    border-bottom:1px solid var(--rule);
+    margin-bottom:8px;
+  }
+  .brand-mark{
+    width:38px;height:38px;
+    border-radius:50%;
+    border:2px solid var(--gold);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Spectral',serif; font-weight:700; font-size:17px;
+    color:var(--gold);
+    margin-bottom:10px;
+  }
+  .brand h1{
+    font-family:'Spectral',serif;
+    font-size:20px; font-weight:600; margin:0 0 2px;
+    letter-spacing:.2px;
+  }
+  .brand p{margin:0; font-size:12px; color:var(--ink-soft);}
+
+  .loan-list{list-style:none; margin:8px 0; padding:0; overflow-y:auto; flex:1;}
+  .loan-item{
+    padding:14px 24px;
+    cursor:pointer;
+    border-bottom:1px solid rgba(201,187,158,0.5);
+    position:relative;
+    transition:background .15s ease;
+  }
+  .loan-item:hover{background:var(--gold-soft);}
+  .loan-item.active{background:var(--gold-soft);}
+  .loan-item.active::before{
+    content:"";
+    position:absolute; left:0; top:0; bottom:0; width:4px;
+    background:var(--gold);
+  }
+  .loan-item .name{font-weight:600; font-size:14.5px; margin-bottom:3px;}
+  .loan-item .meta{font-size:11.5px; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace;}
+  .badge{
+    display:inline-block; font-size:9.5px; font-weight:600; letter-spacing:.4px;
+    text-transform:uppercase; padding:2px 7px; border-radius:3px; margin-top:5px;
+  }
+  .badge.ativo{background:var(--credit-bg); color:var(--credit);}
+  .badge.atraso{background:var(--debit-bg); color:var(--debit);}
+  .badge.quitado{background:#EAE3D2; color:var(--gold);}
+
+  .btn-new{
+    margin:16px 24px 0;
+    padding:11px 14px;
+    background:var(--ink);
+    color:var(--paper-white);
+    border:none; border-radius:4px;
+    font-family:'IBM Plex Sans',sans-serif; font-weight:600; font-size:13.5px;
+    cursor:pointer; letter-spacing:.2px;
+  }
+  .btn-new:hover{background:#152238;}
+
+  .empty-side{padding:24px; font-size:13px; color:var(--ink-soft);}
+
+  /* ---- Main ---- */
+  .main{padding:36px 40px 60px; max-width:960px;}
+  @media (max-width:640px){ .main{padding:20px 16px 50px;} }
+
+  .empty-state{
+    margin-top:80px; text-align:center; color:var(--ink-soft);
+  }
+  .empty-state h2{font-family:'Spectral',serif; color:var(--ink); font-size:24px;}
+
+  /* Form */
+  .form-card{
+    background:var(--paper-white);
+    border:1px solid var(--rule);
+    border-radius:6px;
+    padding:28px;
+    box-shadow:var(--shadow);
+    max-width:520px;
+  }
+  .form-card h2{font-family:'Spectral',serif; margin-top:0; font-size:21px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block; font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:5px; letter-spacing:.2px; text-transform:uppercase;}
+  .field input{
+    width:100%; padding:10px 12px; border:1px solid var(--rule); border-radius:4px;
+    font-family:'IBM Plex Mono',monospace; font-size:14px; background:#fff; color:var(--ink);
+  }
+  .field input:focus{outline:2px solid var(--gold); outline-offset:1px;}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  .form-actions{display:flex; gap:10px; margin-top:22px;}
+  .btn-primary{
+    background:var(--ink); color:#fff; border:none; padding:11px 20px; border-radius:4px;
+    font-weight:600; cursor:pointer; font-size:13.5px;
+  }
+  .btn-secondary{
+    background:transparent; color:var(--ink-soft); border:1px solid var(--rule); padding:11px 20px; border-radius:4px;
+    font-weight:600; cursor:pointer; font-size:13.5px;
+  }
+  .btn-primary:hover{background:#152238;}
+  .btn-secondary:hover{background:var(--paper);}
+
+  /* Contract card */
+  .contract-head{
+    display:flex; justify-content:space-between; align-items:flex-start; gap:20px;
+    flex-wrap:wrap; margin-bottom:26px;
+  }
+  .contract-title h2{font-family:'Spectral',serif; font-size:26px; margin:0 0 4px;}
+  .contract-title .sub{color:var(--ink-soft); font-size:13px;}
+  .stamp{
+    width:96px; height:96px; border-radius:50%;
+    border:3px solid var(--debit); color:var(--debit);
+    display:flex; align-items:center; justify-content:center; text-align:center;
+    font-family:'Spectral',serif; font-weight:700; font-size:13px; letter-spacing:.5px;
+    transform:rotate(-9deg); opacity:.88;
+    flex-shrink:0;
+  }
+  .stamp.quitado{border-color:var(--credit); color:var(--credit);}
+  .stamp.ativo{border-color:var(--gold); color:var(--gold);}
+
+  .summary-grid{
+    display:grid; grid-template-columns:repeat(4,1fr); gap:1px;
+    background:var(--rule); border:1px solid var(--rule); border-radius:6px; overflow:hidden;
+    margin-bottom:28px;
+  }
+  @media (max-width:640px){ .summary-grid{grid-template-columns:repeat(2,1fr);} }
+  .summary-cell{background:var(--paper-white); padding:16px 18px;}
+  .summary-cell .label{font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-soft); margin-bottom:6px;}
+  .summary-cell .value{font-family:'IBM Plex Mono',monospace; font-size:18px; font-weight:600;}
+  .summary-cell.debit .value{color:var(--debit);}
+  .summary-cell.credit .value{color:var(--credit);}
+
+  .toolbar{display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap;}
+  .btn-ghost{
+    background:var(--paper-white); border:1px solid var(--rule); color:var(--ink);
+    padding:9px 16px; border-radius:4px; font-size:13px; font-weight:600; cursor:pointer;
+  }
+  .btn-ghost:hover{background:var(--gold-soft);}
+  .btn-danger{color:var(--debit); border-color:var(--debit);}
+  .btn-danger:hover{background:var(--debit-bg);}
+  @media (max-width:640px){
+    .toolbar{gap:8px;}
+    .toolbar .btn-ghost{flex:1 1 auto; min-height:42px; text-align:center;}
+  }
+
+  /* Ledger table */
+  .ledger{
+    width:100%; border-collapse:collapse; background:var(--paper-white);
+    border:1px solid var(--rule); border-radius:6px; overflow:hidden;
+    font-family:'IBM Plex Mono',monospace; font-size:12.8px;
+  }
+  .ledger thead th{
+    text-align:left; padding:10px 12px; background:var(--ink); color:var(--paper-white);
+    font-family:'IBM Plex Sans',sans-serif; font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; font-weight:600;
+  }
+  .ledger tbody tr{border-top:1px solid var(--rule);}
+  .ledger tbody tr.paga{background:var(--credit-bg);}
+  .ledger tbody tr.atrasada{background:var(--debit-bg);}
+  .ledger td{padding:10px 12px; vertical-align:middle;}
+  .ledger td.num{text-align:right;}
+  .status-tag{font-family:'IBM Plex Sans',sans-serif; font-size:10px; font-weight:600; text-transform:uppercase; padding:2px 7px; border-radius:3px;}
+  .status-tag.pago{background:var(--credit); color:#fff;}
+  .status-tag.pendente{background:#DCD2B8; color:var(--ink);}
+  .status-tag.atrasada{background:var(--debit); color:#fff;}
+  .pay-form{display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
+  .pay-form input{
+    font-family:'IBM Plex Mono',monospace; font-size:12.5px; padding:6px 8px;
+    border:1px solid var(--rule); border-radius:3px; width:96px;
+  }
+  .pay-form input[type=date]{width:130px;}
+  .mini-btn{
+    background:var(--ink); color:#fff; border:none; padding:6px 10px; border-radius:3px;
+    font-size:11.5px; cursor:pointer; font-family:'IBM Plex Sans',sans-serif; font-weight:600;
+  }
+  .mini-btn.undo{background:transparent; color:var(--debit); border:1px solid var(--debit); padding:5px 9px;}
+  .icon-btn{
+    background:transparent; border:1px solid var(--rule); color:var(--ink-soft);
+    width:30px; height:30px; border-radius:4px; cursor:pointer; padding:0;
+    display:inline-flex; align-items:center; justify-content:center; font-size:14px;
+    flex-shrink:0; margin-left:auto;
+  }
+  .icon-btn:hover{background:var(--gold-soft); color:var(--ink); border-color:var(--gold);}
+  @media (max-width:640px){
+    .icon-btn{width:36px; height:36px; font-size:16px; align-self:flex-end;}
+  }
+  .table-scroll{overflow-x:auto;}
+  .footnote{font-size:11.5px; color:var(--ink-soft); margin-top:14px; font-family:'IBM Plex Sans',sans-serif; line-height:1.5;}
+
+  @media (max-width:640px){
+    .contract-title h2{font-size:21px;}
+    .stamp{width:74px; height:74px; font-size:11px;}
+    .ledger thead{display:none;}
+    .ledger, .ledger tbody, .ledger tr, .ledger td{display:block; width:100%;}
+    .ledger{border:none; background:transparent;}
+    .ledger tbody tr{
+      background:var(--paper-white); border:1px solid var(--rule); border-radius:8px;
+      padding:12px 14px; margin-bottom:10px; box-shadow:var(--shadow);
+    }
+    .ledger tbody tr.paga{background:var(--credit-bg);}
+    .ledger tbody tr.atrasada{background:var(--debit-bg);}
+    .ledger td{
+      padding:5px 0; display:flex; justify-content:space-between; align-items:center; gap:12px; text-align:right;
+    }
+    .ledger td.num{text-align:right;}
+    .ledger td::before{
+      content:attr(data-label); font-family:'IBM Plex Sans',sans-serif; font-size:10px;
+      text-transform:uppercase; letter-spacing:.3px; color:var(--ink-soft); font-weight:600; text-align:left;
+    }
+    .ledger td[data-label="#"]{font-size:14px; font-weight:700;}
+    .pay-form{width:100%; flex-direction:column; align-items:stretch; gap:8px;}
+    .pay-form input{width:100%; min-height:42px; font-size:16px;}
+    .pay-form input[type=date]{width:100%;}
+    .mini-btn{width:100%; min-height:40px; font-size:13px;}
+    .mini-btn.undo{width:100%;}
+  }
+
+  /* Modal */
+  .overlay{
+    position:fixed; inset:0; background:rgba(32,48,74,.45);
+    display:none; align-items:center; justify-content:center; z-index:50; padding:20px;
+  }
+  .overlay.open{display:flex;}
+
+  @media (max-width:640px){
+    .overlay{padding:0; align-items:flex-end;}
+    .form-card{
+      max-width:100%; width:100%; border-radius:14px 14px 0 0;
+      max-height:90vh; overflow-y:auto; padding:22px 18px calc(18px + env(safe-area-inset-bottom));
+    }
+    .row2{grid-template-columns:1fr 1fr; gap:10px;}
+    .field input{min-height:44px; font-size:16px;}
+    .form-actions{flex-direction:column-reverse;}
+    .form-actions button{width:100%; min-height:46px;}
+  }
+
+  /* Print */
+  #printArea{display:none;}
+  @media print{
+    body *{visibility:hidden;}
+    #printArea, #printArea *{visibility:visible;}
+    #printArea{display:block; position:absolute; top:0; left:0; width:100%; padding:20px; font-family:'IBM Plex Sans',sans-serif; color:#111;}
+    #printArea h1{font-family:'Spectral',serif;}
+    .p-table{width:100%; border-collapse:collapse; font-family:'IBM Plex Mono',monospace; font-size:11.5px;}
+    .p-table th, .p-table td{border:1px solid #999; padding:6px 8px; text-align:left;}
+    .p-table td.num, .p-table th.num{text-align:right;}
+    .p-summary{display:flex; gap:24px; margin:16px 0 20px; font-family:'IBM Plex Mono',monospace;}
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">L</div>
+      <h1>Livro de Empréstimos</h1>
+      <p>Controle de valores emprestados a terceiros</p>
+    </div>
+    <button class="btn-new" id="btnNewLoan">+ Novo empréstimo</button>
+    <ul class="loan-list" id="loanList"></ul>
+  </aside>
+
+  <main class="main" id="main">
+    <div class="empty-state" id="emptyState">
+      <h2>Nenhum empréstimo selecionado</h2>
+      <p>Cadastre um novo empréstimo ou selecione um na lista ao lado.</p>
+    </div>
+  </main>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="form-card">
+    <h2>Novo empréstimo</h2>
+    <div class="field">
+      <label>Nome do mutuário (a quem foi emprestado)</label>
+      <input type="text" id="fMutuario" placeholder="Ex: João da Silva">
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Data do empréstimo</label>
+        <input type="date" id="fData">
+      </div>
+      <div class="field">
+        <label>Valor emprestado (R$)</label>
+        <input type="text" inputmode="numeric" id="fValor" placeholder="0,00">
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Taxa de juros (% ao ano)</label>
+        <input type="number" id="fTaxa" step="0.01" placeholder="Ex: 24">
+      </div>
+      <div class="field">
+        <label>Quantidade de parcelas</label>
+        <input type="number" id="fParcelas" step="1" min="1" placeholder="Ex: 12">
+      </div>
+    </div>
+    <div class="footnote">As parcelas são calculadas pelo sistema Price (prestações fixas, juros compostos sobre o saldo devedor). Vencimentos mensais a partir da data do empréstimo.</div>
+    <div class="form-actions">
+      <button class="btn-primary" id="btnSaveLoan">Salvar empréstimo</button>
+      <button class="btn-secondary" id="btnCancelLoan">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlayConditions">
+  <div class="form-card">
+    <h2>Editar condições do empréstimo</h2>
+    <div class="field">
+      <label>Taxa de juros (% ao ano)</label>
+      <input type="number" id="cTaxa" step="0.01" placeholder="Ex: 24">
+    </div>
+    <div class="field">
+      <label>Quantidade total de parcelas</label>
+      <input type="number" id="cParcelas" step="1" min="1" placeholder="Ex: 12">
+    </div>
+    <div class="footnote">A nova taxa e a nova quantidade de parcelas valem a partir de agora: as parcelas já pagas não são alteradas, e as vincendas são recalculadas pelo sistema Price com o saldo devedor atual.</div>
+    <div class="form-actions">
+      <button class="btn-primary" id="btnSaveConditions">Salvar condições</button>
+      <button class="btn-secondary" id="btnCancelConditions">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div id="printArea"></div>
+
+<script>
+const fmtBRL = v => (v||0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+const fmtNum = v => (v||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+const fmtDate = s => { if(!s) return '—'; const [y,m,d]=s.split('-'); return `${d}/${m}/${y}`; };
+const todayStr = () => new Date().toISOString().slice(0,10);
+
+function maskCurrencyInput(el){
+  if(!el || el.dataset.masked) return;
+  el.dataset.masked = '1';
+  el.addEventListener('input', () => {
+    const digits = el.value.replace(/\D/g,'');
+    if(!digits){ el.value=''; return; }
+    const num = parseInt(digits,10)/100;
+    el.value = fmtNum(num);
+  });
+}
+function parseCurrencyInput(el){
+  if(!el || !el.value) return NaN;
+  return parseFloat(el.value.replace(/\./g,'').replace(',', '.'));
+}
+
+let loans = [];
+let currentId = null;
+let editingParcela = null;
+
+function addMonths(dateStr, n){
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setMonth(d.getMonth() + n);
+  return d.toISOString().slice(0,10);
+}
+
+// ---------- Storage ----------
+async function loadLoans(){
+  try{
+    const res = await window.storage.get('loans', false);
+    loans = res ? JSON.parse(res.value) : [];
+  }catch(e){
+    loans = [];
+  }
+  let precisaSalvar = false;
+  loans.forEach(loan => {
+    if(!loan.taxaAnualConvertida){
+      const im = loan.taxa/100;
+      loan.taxa = (Math.pow(1+im,12)-1)*100;
+      loan.taxaAnualConvertida = true;
+      precisaSalvar = true;
+    }
+  });
+  if(precisaSalvar) await saveLoans();
+}
+async function saveLoans(){
+  try{
+    await window.storage.set('loans', JSON.stringify(loans), false);
+  }catch(e){
+    console.error('Falha ao salvar', e);
+  }
+}
+
+function ajustarQuantidadeParcelas(loan, novoTotal){
+  const pagas = loan.parcelas.filter(p => p.pago);
+  const naoPagas = loan.parcelas.filter(p => !p.pago);
+  const necessarias = novoTotal - pagas.length;
+
+  let novaCauda = naoPagas.slice(0, Math.max(necessarias,0));
+
+  if(necessarias > naoPagas.length){
+    const faltam = necessarias - naoPagas.length;
+    let ultimaData = novaCauda.length
+      ? novaCauda[novaCauda.length-1].vencimento
+      : (pagas.length ? pagas[pagas.length-1].vencimento : loan.data);
+    for(let k=0; k<faltam; k++){
+      ultimaData = addMonths(ultimaData, 1);
+      novaCauda.push({
+        numero: 0, vencimento: ultimaData, vencimentoOriginal: ultimaData,
+        valorPrevisto: 0, jurosCalc: 0, amortCalc: 0, saldoAntes: 0, saldoApos: 0,
+        valorManual: false, pago: false, valorPago: 0, dataPagamento: null
+      });
+    }
+  }
+
+  const todas = pagas.concat(novaCauda);
+  todas.forEach((p, idx) => p.numero = idx+1);
+  loan.parcelas = todas;
+  loan.numParcelas = novoTotal;
+}
+
+// ---------- Core calculation (Sistema Price) ----------
+function buildParcelas(loan){
+  const n = loan.numParcelas;
+  const parcelas = [];
+  for(let idx=0; idx<n; idx++){
+    parcelas.push({
+      numero: idx+1,
+      vencimento: addMonths(loan.data, idx+1),
+      vencimentoOriginal: addMonths(loan.data, idx+1),
+      valorPrevisto: 0,
+      jurosCalc: 0,
+      amortCalc: 0,
+      saldoAntes: 0,
+      saldoApos: 0,
+      valorManual: false,
+      pago: false,
+      valorPago: 0,
+      dataPagamento: null
+    });
+  }
+  loan.parcelas = parcelas;
+}
+
+function annualToMonthly(taxaAnual){
+  const ia = taxaAnual/100;
+  return Math.pow(1+ia, 1/12) - 1;
+}
+
+function recalcularLoan(loan){
+  const ia = loan.taxa/100;
+  const im = annualToMonthly(loan.taxa);
+  const n = loan.numParcelas;
+  let saldo = loan.principal;
+  let saldoAtual = loan.principal; // saldo devedor logo apos a ultima parcela paga
+  let dataReferencia = loan.data;
+
+  loan.parcelas.forEach((p, idx) => {
+    if(!p.vencimentoOriginal) p.vencimentoOriginal = p.vencimento;
+    const restantes = n - idx;
+    p.saldoAntes = saldo;
+
+    const dataFinal = p.pago ? (p.dataPagamento || p.vencimento) : p.vencimento;
+    const dias = Math.max(0, Math.round((new Date(dataFinal+'T00:00:00') - new Date(dataReferencia+'T00:00:00')) / 86400000));
+    const jurosReal = saldo * (Math.pow(1+ia, dias/365) - 1);
+
+    if(p.pago){
+      const totalPago = p.valorPago;
+      const amort = totalPago - jurosReal;
+      p.jurosCalc = jurosReal;
+      p.amortCalc = amort;
+      saldo = saldo - amort;
+      p.saldoApos = saldo;
+      saldoAtual = saldo;
+    } else {
+      let pmt;
+      if(p.valorManual){
+        pmt = p.valorPrevisto;
+      } else if(restantes <= 1){
+        pmt = saldo + jurosReal;
+      } else if(im === 0){
+        pmt = saldo / restantes;
+      } else {
+        pmt = saldo * im / (1 - Math.pow(1+im, -restantes));
+      }
+      const amort = pmt - jurosReal;
+      if(!p.valorManual) p.valorPrevisto = pmt;
+      p.jurosCalc = jurosReal;
+      p.amortCalc = amort;
+      saldo = saldo - amort;
+      p.saldoApos = saldo;
+    }
+
+    dataReferencia = dataFinal;
+  });
+
+  loan.saldoDevedorAtual = saldoAtual;
+  loan.totalPago = loan.parcelas.reduce((s,p)=> s + (p.pago? p.valorPago:0), 0);
+  loan.quitado = loan.parcelas.every(p => p.pago);
+  loan.temAtraso = loan.parcelas.some(p => !p.pago && p.vencimento < todayStr());
+}
+
+// ---------- Rendering ----------
+function renderSidebar(){
+  const list = document.getElementById('loanList');
+  if(loans.length === 0){
+    list.innerHTML = '<div class="empty-side">Nenhum empréstimo cadastrado ainda.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  loans.forEach(loan => {
+    recalcularLoan(loan);
+    const li = document.createElement('li');
+    li.className = 'loan-item' + (loan.id === currentId ? ' active' : '');
+    let badge = '<span class="badge ativo">Ativo</span>';
+    if(loan.quitado) badge = '<span class="badge quitado">Quitado</span>';
+    else if(loan.temAtraso) badge = '<span class="badge atraso">Em atraso</span>';
+    li.innerHTML = `
+      <div class="name">${loan.mutuario}</div>
+      <div class="meta">${fmtBRL(loan.principal)} · ${loan.numParcelas}x</div>
+      ${badge}
+    `;
+    li.addEventListener('click', () => { currentId = loan.id; editingParcela = null; renderAll(); });
+    list.appendChild(li);
+  });
+}
+
+function renderMain(){
+  const main = document.getElementById('main');
+  const loan = loans.find(l => l.id === currentId);
+  if(!loan){
+    main.innerHTML = `<div class="empty-state" id="emptyState">
+      <h2>Nenhum empréstimo selecionado</h2>
+      <p>Cadastre um novo empréstimo ou selecione um na lista ao lado.</p>
+    </div>`;
+    return;
+  }
+  recalcularLoan(loan);
+
+  const stampClass = loan.quitado ? 'quitado' : (loan.temAtraso ? '' : 'ativo');
+  const stampText = loan.quitado ? 'QUITADO' : (loan.temAtraso ? 'EM ATRASO' : 'EM DIA');
+
+  const proxima = loan.parcelas.find(p => !p.pago);
+
+  main.innerHTML = `
+    <div class="contract-head">
+      <div class="contract-title">
+        <h2>${loan.mutuario}</h2>
+        <div class="sub">Empréstimo de ${fmtDate(loan.data)} · Taxa ${loan.taxa.toFixed(2)}% a.a. · ${loan.numParcelas} parcelas</div>
+      </div>
+      <div class="stamp ${stampClass}">${stampText}</div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-cell"><div class="label">Valor contratado</div><div class="value">${fmtBRL(loan.principal)}</div></div>
+      <div class="summary-cell credit"><div class="label">Total pago</div><div class="value">${fmtBRL(loan.totalPago)}</div></div>
+      <div class="summary-cell debit"><div class="label">Saldo devedor</div><div class="value">${fmtBRL(Math.max(loan.saldoDevedorAtual,0))}</div></div>
+      <div class="summary-cell"><div class="label">Próxima parcela</div><div class="value">${proxima ? fmtBRL(proxima.valorPrevisto) : '—'}</div></div>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn-ghost" id="btnEditConditions">✎ Editar condições</button>
+      <button class="btn-ghost" id="btnPrint">🖨 Imprimir contrato</button>
+      <button class="btn-ghost btn-danger" id="btnDelete">Excluir empréstimo</button>
+    </div>
+
+    <div class="table-scroll">
+      <table class="ledger">
+        <thead>
+          <tr>
+            <th>#</th><th>Vencimento</th><th class="num">Prevista</th>
+            <th>Status</th><th>Pagamento</th><th class="num">Saldo após</th>
+          </tr>
+        </thead>
+        <tbody id="parcelasBody"></tbody>
+      </table>
+    </div>
+    <div class="footnote">Quando o valor pago difere da parcela prevista, o saldo devedor é ajustado e as parcelas vincendas são recalculadas automaticamente pelo sistema Price. Em "editar parcela", ao mudar a data de vencimento o valor da prestação é recalculado na hora, somando os juros proporcionais aos dias adicionados à amortização prevista; você ainda pode digitar outro valor manualmente antes de salvar.</div>
+  `;
+
+  const tbody = document.getElementById('parcelasBody');
+  loan.parcelas.forEach((p, idx) => {
+    const tr = document.createElement('tr');
+    const atrasada = !p.pago && p.vencimento < todayStr();
+    tr.className = p.pago ? 'paga' : (atrasada ? 'atrasada' : '');
+
+    let statusTag = p.pago
+      ? '<span class="status-tag pago">Pago</span>'
+      : (atrasada ? '<span class="status-tag atrasada">Atrasada</span>' : '<span class="status-tag pendente">Pendente</span>');
+
+    let pagamentoCell;
+    if(p.pago){
+      pagamentoCell = `
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+          <span>${fmtBRL(p.valorPago)} em ${fmtDate(p.dataPagamento)}</span>
+          <button class="icon-btn" data-undo="${p.numero}" title="Desfazer pagamento" aria-label="Desfazer pagamento">✎</button>
+        </div>`;
+    } else if(editingParcela === p.numero){
+      pagamentoCell = `
+        <div class="pay-form">
+          <input type="date" id="editDate" value="${p.vencimento}">
+          <input type="text" inputmode="numeric" id="editValue" value="${fmtNum(p.valorPrevisto)}">
+          <button class="mini-btn" data-save-edit="${p.numero}">Salvar</button>
+          ${p.valorManual ? `<button class="mini-btn undo" data-reset-auto="${p.numero}">Restaurar cálculo</button>` : ''}
+          <button class="icon-btn" data-cancel-edit="${p.numero}" title="Cancelar edição" aria-label="Cancelar edição">✎</button>
+        </div>
+        ${p.vencimento !== p.vencimentoOriginal ? `<div class="footnote" style="margin-top:6px;">Vencimento originalmente contratado: ${fmtDate(p.vencimentoOriginal)} · <button class="mini-btn undo" data-reset-date="${p.numero}" style="padding:2px 7px; font-size:10.5px;">usar esta data</button></div>` : ''}`;
+    } else {
+      pagamentoCell = `
+        <div class="pay-form">
+          <input type="date" data-date="${p.numero}" value="${p.vencimentoOriginal}">
+          <input type="text" inputmode="numeric" data-value="${p.numero}" placeholder="${fmtNum(p.valorPrevisto)}">
+          <button class="mini-btn" data-pay="${p.numero}">Registrar</button>
+          <button class="mini-btn undo" data-edit="${p.numero}">editar parcela</button>
+        </div>`;
+    }
+
+    tr.innerHTML = `
+      <td data-label="#">${p.numero}</td>
+      <td data-label="Vencimento">${fmtDate(p.vencimento)}</td>
+      <td data-label="Prevista" class="num">${fmtBRL(p.valorPrevisto)}${p.valorManual ? ' <span title="Valor ajustado manualmente" style="color:var(--gold);">✎</span>' : ''}</td>
+      <td data-label="Status">${statusTag}</td>
+      <td data-label="Pagamento">${pagamentoCell}</td>
+      <td data-label="Saldo após" class="num">${fmtBRL(p.saldoApos)}</td>
+    `;
+    tbody.appendChild(tr);
+
+    const dataBaseRef = idx > 0
+      ? (loan.parcelas[idx-1].pago ? (loan.parcelas[idx-1].dataPagamento || loan.parcelas[idx-1].vencimento) : loan.parcelas[idx-1].vencimento)
+      : loan.data;
+    const dateInput = editingParcela === p.numero
+      ? tr.querySelector('#editDate')
+      : (!p.pago ? tr.querySelector(`[data-date="${p.numero}"]`) : null);
+    const valueInput = editingParcela === p.numero
+      ? tr.querySelector('#editValue')
+      : (!p.pago ? tr.querySelector(`[data-value="${p.numero}"]`) : null);
+
+    if(dateInput && valueInput){
+      const sincronizarValor = () => {
+        const novaData = dateInput.value;
+        if(!novaData) return;
+        const dias = Math.max(0, Math.round((new Date(novaData+'T00:00:00') - new Date(dataBaseRef+'T00:00:00')) / 86400000));
+        const ia = loan.taxa/100;
+        const jurosProporcional = p.saldoAntes * (Math.pow(1+ia, dias/365) - 1);
+        const novoValor = Math.max(jurosProporcional + p.amortCalc, 0);
+        valueInput.value = fmtNum(novoValor);
+      };
+      dateInput.addEventListener('input', sincronizarValor);
+      dateInput.addEventListener('change', sincronizarValor);
+    }
+  });
+
+  tbody.querySelectorAll('[data-value]').forEach(el => maskCurrencyInput(el));
+  maskCurrencyInput(document.getElementById('editValue'));
+
+  tbody.querySelectorAll('[data-pay]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const num = Number(btn.dataset.pay);
+      const valInput = tbody.querySelector(`[data-value="${num}"]`);
+      const dateInput = tbody.querySelector(`[data-date="${num}"]`);
+      const parcela = loan.parcelas.find(p => p.numero === num);
+      let valor = parseCurrencyInput(valInput);
+      if(isNaN(valor) || valor <= 0) valor = parcela.valorPrevisto;
+      parcela.pago = true;
+      parcela.valorPago = valor;
+      parcela.dataPagamento = dateInput.value || todayStr();
+      await saveLoans();
+      renderAll();
+    });
+  });
+
+  tbody.querySelectorAll('[data-undo]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const num = Number(btn.dataset.undo);
+      const parcela = loan.parcelas.find(p => p.numero === num);
+      parcela.pago = false;
+      parcela.valorPago = 0;
+      parcela.dataPagamento = null;
+      await saveLoans();
+      renderAll();
+    });
+  });
+
+  tbody.querySelectorAll('[data-edit]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      editingParcela = Number(btn.dataset.edit);
+      renderAll();
+    });
+  });
+
+  tbody.querySelectorAll('[data-cancel-edit]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      editingParcela = null;
+      renderAll();
+    });
+  });
+
+  tbody.querySelectorAll('[data-save-edit]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const num = Number(btn.dataset.saveEdit);
+      const parcela = loan.parcelas.find(p => p.numero === num);
+      const newDate = document.getElementById('editDate').value;
+      const newValue = parseCurrencyInput(document.getElementById('editValue'));
+      if(newDate) parcela.vencimento = newDate;
+      if(!isNaN(newValue) && newValue > 0){
+        parcela.valorPrevisto = newValue;
+        parcela.valorManual = true;
+      }
+      editingParcela = null;
+      await saveLoans();
+      renderAll();
+    });
+  });
+
+  tbody.querySelectorAll('[data-reset-date]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const num = Number(btn.dataset.resetDate);
+      const parcela = loan.parcelas.find(p => p.numero === num);
+      const dateField = document.getElementById('editDate');
+      if(dateField) dateField.value = parcela.vencimentoOriginal;
+    });
+  });
+
+  tbody.querySelectorAll('[data-reset-auto]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const num = Number(btn.dataset.resetAuto);
+      const parcela = loan.parcelas.find(p => p.numero === num);
+      parcela.valorManual = false;
+      editingParcela = null;
+      await saveLoans();
+      renderAll();
+    });
+  });
+
+  document.getElementById('btnEditConditions').addEventListener('click', () => {
+    document.getElementById('cTaxa').value = loan.taxa.toFixed(2);
+    document.getElementById('cParcelas').value = loan.numParcelas;
+    overlayConditions.classList.add('open');
+  });
+
+  document.getElementById('btnDelete').addEventListener('click', async () => {
+    if(confirm(`Excluir o empréstimo de ${loan.mutuario}? Esta ação não pode ser desfeita.`)){
+      loans = loans.filter(l => l.id !== loan.id);
+      currentId = null;
+      await saveLoans();
+      renderAll();
+    }
+  });
+
+  document.getElementById('btnPrint').addEventListener('click', () => printLoan(loan));
+}
+
+function renderAll(){
+  renderSidebar();
+  renderMain();
+}
+
+// ---------- Print ----------
+function printLoan(loan){
+  const area = document.getElementById('printArea');
+  const rows = loan.parcelas.map(p => `
+    <tr>
+      <td>${p.numero}</td>
+      <td>${fmtDate(p.vencimento)}</td>
+      <td class="num">${fmtBRL(p.valorPrevisto)}</td>
+      <td>${p.pago ? 'Pago' : (p.vencimento < todayStr() ? 'Atrasada' : 'Pendente')}</td>
+      <td>${p.pago ? fmtBRL(p.valorPago) : '—'}</td>
+      <td>${p.pago ? fmtDate(p.dataPagamento) : '—'}</td>
+      <td class="num">${fmtBRL(p.saldoApos)}</td>
+    </tr>
+  `).join('');
+
+  area.innerHTML = `
+    <h1>Contrato de Empréstimo</h1>
+    <p><strong>Mutuário:</strong> ${loan.mutuario}<br>
+    <strong>Data do empréstimo:</strong> ${fmtDate(loan.data)}<br>
+    <strong>Valor emprestado:</strong> ${fmtBRL(loan.principal)}<br>
+    <strong>Taxa de juros:</strong> ${loan.taxa.toFixed(2)}% ao ano (Sistema Price)<br>
+    <strong>Quantidade de parcelas:</strong> ${loan.numParcelas}</p>
+
+    <div class="p-summary">
+      <div><strong>Total pago:</strong> ${fmtBRL(loan.totalPago)}</div>
+      <div><strong>Saldo devedor atual:</strong> ${fmtBRL(Math.max(loan.saldoDevedorAtual,0))}</div>
+      <div><strong>Situação:</strong> ${loan.quitado ? 'Quitado' : (loan.temAtraso ? 'Em atraso' : 'Em dia')}</div>
+    </div>
+
+    <table class="p-table">
+      <thead>
+        <tr>
+          <th>#</th><th>Vencimento</th><th class="num">Valor previsto</th>
+          <th>Status</th><th>Valor pago</th><th>Data pagto.</th><th class="num">Saldo após</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+  window.print();
+}
+
+// ---------- New loan form ----------
+const overlay = document.getElementById('overlay');
+document.getElementById('btnNewLoan').addEventListener('click', () => {
+  document.getElementById('fMutuario').value = '';
+  document.getElementById('fData').value = todayStr();
+  document.getElementById('fValor').value = '';
+  document.getElementById('fTaxa').value = '';
+  document.getElementById('fParcelas').value = '';
+  maskCurrencyInput(document.getElementById('fValor'));
+  overlay.classList.add('open');
+});
+document.getElementById('btnCancelLoan').addEventListener('click', () => overlay.classList.remove('open'));
+
+document.getElementById('btnSaveLoan').addEventListener('click', async () => {
+  const mutuario = document.getElementById('fMutuario').value.trim();
+  const data = document.getElementById('fData').value;
+  const principal = parseCurrencyInput(document.getElementById('fValor'));
+  const taxa = parseFloat(document.getElementById('fTaxa').value);
+  const numParcelas = parseInt(document.getElementById('fParcelas').value, 10);
+
+  if(!mutuario || !data || isNaN(principal) || principal<=0 || isNaN(taxa) || taxa<0 || isNaN(numParcelas) || numParcelas<1){
+    alert('Preencha todos os campos corretamente.');
+    return;
+  }
+
+  const loan = {
+    id: 'loan_' + Date.now(),
+    mutuario, data, principal, taxa, numParcelas,
+    taxaAnualConvertida: true
+  };
+  buildParcelas(loan);
+  loans.push(loan);
+  currentId = loan.id;
+  await saveLoans();
+  overlay.classList.remove('open');
+  renderAll();
+});
+
+// ---------- Edit conditions (taxa / quantidade de parcelas) ----------
+const overlayConditions = document.getElementById('overlayConditions');
+document.getElementById('btnCancelConditions').addEventListener('click', () => overlayConditions.classList.remove('open'));
+
+document.getElementById('btnSaveConditions').addEventListener('click', async () => {
+  const loan = loans.find(l => l.id === currentId);
+  if(!loan) return;
+
+  const novaTaxa = parseFloat(document.getElementById('cTaxa').value);
+  const novoTotal = parseInt(document.getElementById('cParcelas').value, 10);
+  const pagas = loan.parcelas.filter(p => p.pago).length;
+
+  if(isNaN(novaTaxa) || novaTaxa < 0){
+    alert('Informe uma taxa de juros válida.');
+    return;
+  }
+  if(isNaN(novoTotal) || novoTotal < 1){
+    alert('Informe uma quantidade de parcelas válida.');
+    return;
+  }
+  if(novoTotal < pagas){
+    alert(`A quantidade de parcelas não pode ser menor que as ${pagas} já pagas.`);
+    return;
+  }
+
+  loan.taxa = novaTaxa;
+  if(novoTotal !== loan.numParcelas){
+    ajustarQuantidadeParcelas(loan, novoTotal);
+  }
+  editingParcela = null;
+  await saveLoans();
+  overlayConditions.classList.remove('open');
+  renderAll();
+});
+
+// ---------- Init ----------
+(async function init(){
+  await loadLoans();
+  renderAll();
+})();
+</script>
+</body>
+</html>
