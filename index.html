@@ -31,73 +31,25 @@
     overflow-x:hidden;
   }
   .app{
-    display:grid;
-    grid-template-columns: 300px 1fr;
+    display:block;
     min-height:100vh;
   }
-  @media (max-width: 640px){
-    .app{grid-template-columns: 1fr;}
-    .sidebar{
-      order:1; border-right:none; border-bottom:2px solid var(--rule);
-      display:flex; flex-wrap:wrap; flex-direction:row; align-items:center;
-      padding:6px 10px; gap:6px;
-      position:sticky; top:0; z-index:20;
-    }
-    .brand{display:none;}
-    .btn-new{
-      order:1; margin:0; padding:6px 10px; font-size:11.5px; white-space:nowrap;
-      flex-shrink:0; min-height:30px;
-    }
-    .backup-row{order:2; margin:0; flex-shrink:0; display:flex; gap:5px;}
-    .btn-backup{white-space:nowrap; padding:6px 9px; min-height:30px; font-size:10.5px;}
-    .btn-loans-toggle{
-      order:3; margin:0 0 0 auto; padding:6px 10px; font-size:11.5px; white-space:nowrap;
-      min-height:30px; flex-shrink:0;
-      background:var(--ink); color:#fff; border:none; border-radius:4px; cursor:pointer;
-      font-family:'IBM Plex Sans',sans-serif; font-weight:600;
-      display:inline-flex; align-items:center; gap:4px;
-    }
-    .loans-panel{
-      display:none;
-      position:fixed; top:0; left:0; right:0; bottom:0; z-index:31;
-      background:var(--paper-white); flex-direction:column;
-    }
-    .loans-panel.open{display:flex;}
-    .loans-panel-header{
-      display:flex; align-items:center; justify-content:space-between;
-      padding:16px 18px; border-bottom:1px solid var(--rule);
-      font-family:'Spectral',serif; font-size:18px; font-weight:600; flex-shrink:0;
-      padding-top:calc(16px + env(safe-area-inset-top));
-    }
-    .loans-panel-close{
-      background:transparent; border:1px solid var(--rule); color:var(--ink-soft);
-      width:32px; height:32px; border-radius:50%; font-size:15px; cursor:pointer;
-    }
-    .loan-list{
-      display:flex; flex-direction:column; gap:0; overflow-y:auto; flex:1;
-      margin:0; padding:6px 0;
-    }
-    .loan-item{
-      padding:14px 18px; border-bottom:1px solid rgba(201,187,158,0.5); border-radius:0;
-      white-space:normal; flex-shrink:0; display:flex; flex-direction:column; align-items:flex-start; gap:3px;
-    }
-    .loan-item .name{font-size:14.5px; margin-bottom:0;}
-    .loan-item .meta{display:block; font-size:11.5px;}
-    .badge{margin-top:2px; font-size:9.5px;}
-    .main{order:2;}
+  .sidebar{
+    display:flex; flex-direction:column;
+    min-height:100vh; padding:calc(20px + env(safe-area-inset-top)) 0 20px;
+    border-right:none;
+    background:var(--paper-white);
+  }
+  .sidebar.hidden{display:none;}
+  .main{display:none;}
+  .main.visible{display:block;}
+
+  @media (min-width: 641px){
+    .sidebar{ max-width:480px; margin:0 auto; }
+    .main.visible{ max-width:960px; margin:0 auto; }
   }
 
   /* ---- Sidebar ---- */
-  .btn-loans-toggle{display:none;}
-  .loans-panel{display:contents;}
-  .loans-panel-header{display:none;}
-  .sidebar{
-    background:var(--paper-white);
-    border-right:2px solid var(--rule);
-    padding:28px 0 40px;
-    display:flex;
-    flex-direction:column;
-  }
   .brand{
     padding:0 24px 20px;
     border-bottom:1px solid var(--rule);
@@ -376,28 +328,19 @@
 <body>
 
 <div class="app">
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebar">
     <div class="brand">
       <div class="brand-mark">C</div>
       <h1>Controle de Empréstimos</h1>
       <p>Controle de valores emprestados a terceiros</p>
     </div>
+    <ul class="loan-list" id="loanList"></ul>
     <button class="btn-new" id="btnNewLoan" title="Novo empréstimo"><span class="btn-icon">+</span><span class="btn-label"> Novo empréstimo</span></button>
     <div class="backup-row">
       <button class="btn-backup" id="btnBackup" title="Baixar backup de todos os empréstimos"><span class="btn-icon">⬇</span><span class="btn-label"> Backup</span></button>
       <button class="btn-backup" id="btnRestore" title="Restaurar a partir de um arquivo de backup"><span class="btn-icon">⬆</span><span class="btn-label"> Restaurar</span></button>
     </div>
     <input type="file" id="fileRestore" accept="application/json,.json" style="display:none;">
-    <button class="btn-loans-toggle" id="btnLoansToggle" title="Ver empréstimos">
-      <span class="btn-icon">☰</span><span class="btn-label"> Empréstimos</span>
-    </button>
-    <div class="loans-panel" id="loansPanel">
-      <div class="loans-panel-header">
-        <span>Empréstimos</span>
-        <button class="loans-panel-close" id="btnCloseLoansPanel" aria-label="Fechar lista">✕</button>
-      </div>
-      <ul class="loan-list" id="loanList"></ul>
-    </div>
   </aside>
 
   <main class="main" id="main">
@@ -718,7 +661,6 @@ function renderSidebar(){
     li.addEventListener('click', () => {
       currentId = loan.id;
       editingParcela = null;
-      fecharPainelEmprestimos();
       renderAll();
     });
     list.appendChild(li);
@@ -976,6 +918,7 @@ function renderMain(){
 function renderAll(){
   renderSidebar();
   renderMain();
+  atualizarTelaAtiva();
 }
 
 // ---------- Print ----------
@@ -1141,15 +1084,18 @@ document.getElementById('btnSaveConditions').addEventListener('click', async () 
   renderAll();
 });
 
-// ---------- Painel de empréstimos (mobile) ----------
-function abrirPainelEmprestimos(){
-  document.getElementById('loansPanel').classList.add('open');
+// ---------- Alternância entre tela principal e tela do empréstimo (mobile) ----------
+function atualizarTelaAtiva(){
+  const sidebar = document.getElementById('sidebar');
+  const main = document.getElementById('main');
+  if(currentId){
+    sidebar.classList.add('hidden');
+    main.classList.add('visible');
+  } else {
+    sidebar.classList.remove('hidden');
+    main.classList.remove('visible');
+  }
 }
-function fecharPainelEmprestimos(){
-  document.getElementById('loansPanel').classList.remove('open');
-}
-document.getElementById('btnLoansToggle').addEventListener('click', abrirPainelEmprestimos);
-document.getElementById('btnCloseLoansPanel').addEventListener('click', fecharPainelEmprestimos);
 
 // ---------- Init ----------
 (async function init(){
