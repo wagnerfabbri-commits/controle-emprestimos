@@ -39,17 +39,18 @@
     .app{grid-template-columns: 1fr;}
     .sidebar{
       order:1; border-right:none; border-bottom:2px solid var(--rule);
-      flex-direction:row; align-items:center; padding:10px 12px; gap:10px;
+      flex-direction:row; align-items:center; padding:8px 10px; gap:5px;
       position:sticky; top:0; z-index:20; overflow-x:auto; -webkit-overflow-scrolling:touch;
     }
-    .brand{padding:0; border-bottom:none; margin-bottom:0; display:flex; align-items:center; flex-shrink:0;}
-    .brand-mark{width:30px; height:30px; font-size:14px; margin-bottom:0; margin-right:0;}
-    .brand h1, .brand p{display:none;}
-    .btn-new{margin:0; padding:9px 12px; font-size:12.5px; white-space:nowrap; flex-shrink:0; min-height:38px;}
-    .backup-row{margin:0; flex-shrink:0;}
-    .btn-backup{white-space:nowrap; padding:9px 10px; min-height:38px; font-size:11.5px;}
+    .brand{display:none;}
+    .btn-new, .btn-backup{
+      width:28px; height:28px; min-height:28px; padding:0; font-size:14px;
+      display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
+    }
+    .btn-new .btn-label, .btn-backup .btn-label{display:none;}
+    .backup-row{margin:0; flex-shrink:0; display:flex; gap:5px;}
     .loan-list{
-      display:flex; flex-direction:row; gap:8px; overflow-x:auto; flex:0 1 auto;
+      display:flex; flex-direction:row; gap:8px; overflow-x:auto; flex:1 1 auto;
       -webkit-overflow-scrolling:touch; margin:0; padding:0 2px;
     }
     .loan-item{
@@ -341,10 +342,10 @@
       <h1>Controle de Empréstimos</h1>
       <p>Controle de valores emprestados a terceiros</p>
     </div>
-    <button class="btn-new" id="btnNewLoan">+ Novo empréstimo</button>
+    <button class="btn-new" id="btnNewLoan" title="Novo empréstimo"><span class="btn-icon">+</span><span class="btn-label"> Novo empréstimo</span></button>
     <div class="backup-row">
-      <button class="btn-backup" id="btnBackup" title="Baixar backup de todos os empréstimos">⬇ Backup</button>
-      <button class="btn-backup" id="btnRestore" title="Restaurar a partir de um arquivo de backup">⬆ Restaurar</button>
+      <button class="btn-backup" id="btnBackup" title="Baixar backup de todos os empréstimos"><span class="btn-icon">⬇</span><span class="btn-label"> Backup</span></button>
+      <button class="btn-backup" id="btnRestore" title="Restaurar a partir de um arquivo de backup"><span class="btn-icon">⬆</span><span class="btn-label"> Restaurar</span></button>
     </div>
     <input type="file" id="fileRestore" accept="application/json,.json" style="display:none;">
     <ul class="loan-list" id="loanList"></ul>
@@ -368,7 +369,7 @@
     <div class="row2">
       <div class="field">
         <label>Data do empréstimo</label>
-        <input type="date" id="fData">
+        <input type="text" inputmode="numeric" id="fData" placeholder="dd/mm/aaaa" maxlength="10">
       </div>
       <div class="field">
         <label>Valor emprestado (R$)</label>
@@ -470,13 +471,34 @@ function addMonths(dateStr, n){
 }
 
 // ---------- Storage ----------
+// Usa localStorage do navegador (funciona em qualquer lugar hospedado, ex: GitHub Pages).
+// Se o app estiver rodando dentro do ambiente do Claude (window.storage disponível), usa esse recurso também,
+// mantendo compatibilidade nos dois contextos.
+const LOCAL_KEY = 'controle-emprestimos:loans';
+
 async function loadLoans(){
-  try{
-    const res = await window.storage.get('loans', false);
-    loans = res ? JSON.parse(res.value) : [];
-  }catch(e){
-    loans = [];
+  let carregado = false;
+
+  if(typeof window.storage !== 'undefined'){
+    try{
+      const res = await window.storage.get('loans', false);
+      loans = res ? JSON.parse(res.value) : [];
+      carregado = true;
+    }catch(e){
+      // chave ainda não existe nesse ambiente; segue para tentar o localStorage
+    }
   }
+
+  if(!carregado){
+    try{
+      const raw = localStorage.getItem(LOCAL_KEY);
+      loans = raw ? JSON.parse(raw) : [];
+    }catch(e){
+      console.error('Falha ao carregar do localStorage', e);
+      loans = [];
+    }
+  }
+
   let precisaSalvar = false;
   loans.forEach(loan => {
     if(!loan.taxaAnualConvertida){
@@ -488,11 +510,22 @@ async function loadLoans(){
   });
   if(precisaSalvar) await saveLoans();
 }
+
 async function saveLoans(){
+  const conteudo = JSON.stringify(loans);
+
   try{
-    await window.storage.set('loans', JSON.stringify(loans), false);
+    localStorage.setItem(LOCAL_KEY, conteudo);
   }catch(e){
-    console.error('Falha ao salvar', e);
+    console.error('Falha ao salvar no localStorage', e);
+  }
+
+  if(typeof window.storage !== 'undefined'){
+    try{
+      await window.storage.set('loans', conteudo, false);
+    }catch(e){
+      // ambiente sem esse recurso; localStorage já garantiu a gravação acima
+    }
   }
 }
 
@@ -963,18 +996,19 @@ document.getElementById('fileRestore').addEventListener('change', async (e) => {
 const overlay = document.getElementById('overlay');
 document.getElementById('btnNewLoan').addEventListener('click', () => {
   document.getElementById('fMutuario').value = '';
-  document.getElementById('fData').value = todayStr();
+  document.getElementById('fData').value = isoToBR(todayStr());
   document.getElementById('fValor').value = '';
   document.getElementById('fTaxa').value = '';
   document.getElementById('fParcelas').value = '';
   maskCurrencyInput(document.getElementById('fValor'));
+  maskDateInput(document.getElementById('fData'));
   overlay.classList.add('open');
 });
 document.getElementById('btnCancelLoan').addEventListener('click', () => overlay.classList.remove('open'));
 
 document.getElementById('btnSaveLoan').addEventListener('click', async () => {
   const mutuario = document.getElementById('fMutuario').value.trim();
-  const data = document.getElementById('fData').value;
+  const data = brToISO(document.getElementById('fData').value);
   const principal = parseCurrencyInput(document.getElementById('fValor'));
   const taxa = parseFloat(document.getElementById('fTaxa').value);
   const numParcelas = parseInt(document.getElementById('fParcelas').value, 10);
