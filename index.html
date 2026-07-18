@@ -338,6 +338,8 @@
       font-family:'IBM Plex Sans',sans-serif; color:#111;
     }
     #printArea h1{font-family:'Spectral',serif; margin-top:0;}
+    .p-subtitle{font-family:'Spectral',serif; font-size:14px; margin:18px 0 8px;}
+    .p-history-table{margin-bottom:18px;}
     .p-table{width:100%; border-collapse:collapse; font-family:'IBM Plex Mono',monospace; font-size:11.5px;}
     .p-table th, .p-table td{border:1px solid #999; padding:6px 8px; text-align:left;}
     .p-table tr{page-break-inside:avoid;}
@@ -999,6 +1001,20 @@ function printLoan(loan){
     </tr>
   `).join('');
 
+  const historicoHtml = (loan.historico && loan.historico.length) ? `
+    <h2 class="p-subtitle">Histórico de alterações</h2>
+    <table class="p-table p-history-table">
+      <thead>
+        <tr><th>Data/hora</th><th>Alteração</th></tr>
+      </thead>
+      <tbody>
+        ${[...loan.historico].reverse().map(h => `
+          <tr><td>${fmtDateTime(h.ts)}</td><td>${h.texto}</td></tr>
+        `).join('')}
+      </tbody>
+    </table>
+  ` : '';
+
   area.innerHTML = `
     <h1>Contrato de Empréstimo</h1>
     <p><strong>Nome:</strong> ${loan.mutuario}<br>
@@ -1006,6 +1022,8 @@ function printLoan(loan){
     <strong>Valor:</strong> ${fmtBRL(loan.principal)}<br>
     <strong>Encargos:</strong> ${loan.taxa.toFixed(2)}% ao ano (Sistema Price)<br>
     <strong>Quantidade de parcelas:</strong> ${loan.numParcelas}</p>
+
+    ${historicoHtml}
 
     <div class="p-summary">
       <div><strong>Total pago:</strong> ${fmtBRL(loan.totalPago)}</div>
