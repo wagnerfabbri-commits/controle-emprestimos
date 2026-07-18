@@ -424,7 +424,14 @@
       <label>Quantidade total de parcelas</label>
       <input type="number" id="cParcelas" step="1" min="1" placeholder="Ex: 12">
     </div>
-    <div class="footnote">A nova taxa e a nova quantidade de parcelas valem a partir de agora: as parcelas já pagas não são alteradas, e as vincendas são recalculadas pelo sistema Price com o saldo devedor atual.</div>
+    <div class="field">
+      <label>Data de vigência da alteração</label>
+      <div class="date-overlay-wrap">
+        <input type="text" inputmode="numeric" id="cVigencia" placeholder="dd/mm/aaaa" maxlength="10" readonly>
+        <input type="date" id="cVigenciaOverlay" class="date-native-overlay" tabindex="-1" aria-hidden="true">
+      </div>
+    </div>
+    <div class="footnote">A nova quantidade de parcelas vale a partir de agora para as parcelas vincendas. A nova taxa de juros passa a valer a partir da data de vigência informada: os juros até essa data continuam sendo calculados com a taxa anterior.</div>
     <div class="form-actions">
       <button class="btn-primary" id="btnSaveConditions">Salvar condições</button>
       <button class="btn-secondary" id="btnCancelConditions">Cancelar</button>
@@ -609,6 +616,40 @@ function annualToMonthly(taxaAnual){
   return Math.pow(1+ia, 1/12) - 1;
 }
 
+function taxaEmVigor(dataStr, condicoes){
+  let taxa = condicoes[0].taxa;
+  for(const c of condicoes){
+    if(c.desde <= dataStr) taxa = c.taxa;
+  }
+  return taxa;
+}
+
+function calcularJurosPeriodo(saldo, dataInicio, dataFim, condicoes){
+  const inicio = new Date(dataInicio+'T00:00:00');
+  const fim = new Date(dataFim+'T00:00:00');
+  if(fim <= inicio || saldo <= 0) return 0;
+
+  const marcos = [inicio];
+  condicoes.forEach(c => {
+    const d = new Date(c.desde+'T00:00:00');
+    if(d > inicio && d < fim) marcos.push(d);
+  });
+  marcos.push(fim);
+  marcos.sort((a,b) => a-b);
+
+  let saldoAtual = saldo;
+  for(let i=0; i<marcos.length-1; i++){
+    const segInicio = marcos[i];
+    const segFim = marcos[i+1];
+    const dias = Math.round((segFim - segInicio)/86400000);
+    if(dias <= 0) continue;
+    const taxaVigente = taxaEmVigor(segInicio.toISOString().slice(0,10), condicoes);
+    const ia = taxaVigente/100;
+    saldoAtual = saldoAtual * Math.pow(1+ia, dias/365);
+  }
+  return saldoAtual - saldo;
+}
+
 function registrarHistorico(loan, texto){
   if(!loan.historico) loan.historico = [];
   loan.historico.push({ ts: new Date().toISOString(), texto });
@@ -616,7 +657,9 @@ function registrarHistorico(loan, texto){
 
 function recalcularLoan(loan){
   if(!loan.historico) loan.historico = [];
-  const ia = loan.taxa/100;
+  if(!loan.condicoes || !loan.condicoes.length){
+    loan.condicoes = [{ taxa: loan.taxa, desde: loan.data }];
+  }
   const im = annualToMonthly(loan.taxa);
   const n = loan.numParcelas;
   let saldo = loan.principal;
@@ -629,8 +672,7 @@ function recalcularLoan(loan){
     p.saldoAntes = saldo;
 
     const dataFinal = p.pago ? (p.dataPagamento || p.vencimento) : p.vencimento;
-    const dias = Math.max(0, Math.round((new Date(dataFinal+'T00:00:00') - new Date(dataReferencia+'T00:00:00')) / 86400000));
-    const jurosReal = saldo * (Math.pow(1+ia, dias/365) - 1);
+    const jurosReal = calcularJurosPeriodo(saldo, dataReferencia, dataFinal, loan.condicoes);
 
     if(p.pago){
       const totalPago = p.valorPago;
@@ -870,7 +912,6 @@ function renderMain(){
       parcela.pago = true;
       parcela.valorPago = valor;
       parcela.dataPagamento = brToISO(dateInput.value) || todayStr();
-      registrarHistorico(loan, `Parcela ${num} paga: ${fmtBRL(valor)} em ${fmtDate(parcela.dataPagamento)}`);
       await saveLoans();
       renderAll();
     });
@@ -965,6 +1006,8 @@ function renderMain(){
   document.getElementById('btnEditConditions').addEventListener('click', () => {
     document.getElementById('cTaxa').value = loan.taxa.toFixed(2);
     document.getElementById('cParcelas').value = loan.numParcelas;
+    document.getElementById('cVigencia').value = isoToBR(todayStr());
+    wireDateOverlay(document.getElementById('cVigencia'), document.getElementById('cVigenciaOverlay'));
     overlayConditions.classList.add('open');
   });
 
@@ -1121,10 +1164,10 @@ document.getElementById('btnSaveLoan').addEventListener('click', async () => {
     id: 'loan_' + Date.now(),
     mutuario, data, principal, taxa, numParcelas,
     taxaAnualConvertida: true,
-    historico: []
+    historico: [],
+    condicoes: [{ taxa, desde: data }]
   };
   buildParcelas(loan);
-  registrarHistorico(loan, `Empréstimo criado: ${fmtBRL(principal)} em ${numParcelas}x, taxa ${taxa.toFixed(2)}% a.a.`);
   loans.push(loan);
   currentId = loan.id;
   await saveLoans();
@@ -1142,6 +1185,7 @@ document.getElementById('btnSaveConditions').addEventListener('click', async () 
 
   const novaTaxa = parseFloat(document.getElementById('cTaxa').value);
   const novoTotal = parseInt(document.getElementById('cParcelas').value, 10);
+  const dataVigencia = brToISO(document.getElementById('cVigencia').value);
   const pagas = loan.parcelas.filter(p => p.pago).length;
 
   if(isNaN(novaTaxa) || novaTaxa < 0){
@@ -1156,11 +1200,21 @@ document.getElementById('btnSaveConditions').addEventListener('click', async () 
     alert(`A quantidade de parcelas não pode ser menor que as ${pagas} já pagas.`);
     return;
   }
+  if(!dataVigencia){
+    alert('Informe a data de vigência da alteração.');
+    return;
+  }
 
   const taxaAntiga = loan.taxa;
   const totalAntigo = loan.numParcelas;
   const partes = [];
-  if(novaTaxa !== taxaAntiga) partes.push(`taxa de ${taxaAntiga.toFixed(2)}% para ${novaTaxa.toFixed(2)}% a.a.`);
+  if(novaTaxa !== taxaAntiga){
+    partes.push(`taxa de ${taxaAntiga.toFixed(2)}% para ${novaTaxa.toFixed(2)}% a.a. a partir de ${fmtDate(dataVigencia)}`);
+    if(!loan.condicoes) loan.condicoes = [{ taxa: taxaAntiga, desde: loan.data }];
+    loan.condicoes = loan.condicoes.filter(c => c.desde !== dataVigencia);
+    loan.condicoes.push({ taxa: novaTaxa, desde: dataVigencia });
+    loan.condicoes.sort((a,b) => a.desde < b.desde ? -1 : 1);
+  }
   if(novoTotal !== totalAntigo) partes.push(`quantidade de parcelas de ${totalAntigo} para ${novoTotal}`);
 
   loan.taxa = novaTaxa;
